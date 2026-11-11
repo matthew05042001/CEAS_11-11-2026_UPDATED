@@ -1,3 +1,7 @@
+TO BE SUBMITTED TO LEBRON
+
+
+
 # Graduate School System
 
 A Laravel and React application for graduate-school workflows, including comprehensive exam applications, defense requests, schedules, payments, and related administrative processes.
