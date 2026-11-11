@@ -13,6 +13,8 @@ type Schedule = {
     allDay?: boolean;
     origin?: string;
     description?: string;
+    updated?: boolean;
+    change_reason?: string | null;
     data?: { status?: string; workflow_state?: string };
 };
 
@@ -73,6 +75,20 @@ export default function StudentSchedulesWidget({ onTodayCount }: { onTodayCount?
         void load();
         return () => controller.abort();
     }, [monthKey, onTodayCount, retry]);
+
+    useEffect(() => {
+        const refresh = () => {
+            if (document.visibilityState === 'visible') setRetry((value) => value + 1);
+        };
+        const timer = window.setInterval(refresh, 30000);
+        window.addEventListener('focus', refresh);
+        document.addEventListener('visibilitychange', refresh);
+        return () => {
+            window.clearInterval(timer);
+            window.removeEventListener('focus', refresh);
+            document.removeEventListener('visibilitychange', refresh);
+        };
+    }, []);
 
     const dayEvents = useMemo(
         () => events.filter((item) => scheduleOnDay(item, selected)).sort((a, b) => a.start.localeCompare(b.start) || a.title.localeCompare(b.title)),
@@ -140,13 +156,27 @@ export default function StudentSchedulesWidget({ onTodayCount }: { onTodayCount?
                         <ul className="space-y-3">
                             {dayEvents.map((item) => (
                                 <li key={item.id} className="border-border rounded-lg border p-4">
-                                    <p className="font-medium break-words">{item.title}</p>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <p className="font-medium break-words">{item.title}</p>
+                                        {item.origin === 'comprehensive-exam' && item.updated && (
+                                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                                                Updated
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-muted-foreground mt-2 flex items-center gap-2 text-xs">
                                         <Clock className="h-3.5 w-3.5" />
                                         {time(item)}
                                     </p>
-                                    <p className="text-muted-foreground mt-1 text-xs">{item.origin === 'defense' ? 'Defense' : 'School event'}</p>
+                                    <p className="text-muted-foreground mt-1 text-xs">
+                                        {item.origin === 'defense' ? 'Defense' : item.origin === 'comprehensive-exam' ? 'Comprehensive exam' : 'School event'}
+                                    </p>
                                     {item.description && <p className="text-muted-foreground mt-2 text-sm break-words">{item.description}</p>}
+                                    {item.origin === 'comprehensive-exam' && item.change_reason && (
+                                        <p className="mt-2 text-sm font-medium text-amber-800 dark:text-amber-200">
+                                            Reason for update: {item.change_reason}
+                                        </p>
+                                    )}
                                 </li>
                             ))}
                         </ul>

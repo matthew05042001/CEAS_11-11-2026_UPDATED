@@ -18,29 +18,31 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { router } from '@inertiajs/react';
 import { format } from 'date-fns';
-import { Check, CheckCircle, CircleArrowLeft, CircleX, Filter, Info } from 'lucide-react';
+import { Check, CheckCircle, CircleArrowLeft, CircleX, Filter, Info, ShieldCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { ComprePaymentSummary } from './Index';
 import Details from './details';
 
-type Columns = { student: boolean; program: boolean; reference: boolean; amount: boolean; date: boolean; status: boolean; actions: boolean };
+type Columns = { student: boolean; program: boolean; reference: boolean; amount: boolean; date: boolean; status: boolean; examPermit: boolean; actions: boolean };
 
 type Props = {
     paged: ComprePaymentSummary[];
     columns: Columns;
     tabType?: 'pending' | 'approved' | 'rejected';
+    canSetExamPermit: boolean;
     onRowApprove?: (id: number) => void;
     onRowReject?: (id: number) => void;
     onRowRetrieve?: (id: number) => void;
 };
 
-export default function TableComprePayment({ paged, columns, tabType, onRowRetrieve }: Props) {
+export default function TableComprePayment({ paged, columns, tabType, canSetExamPermit, onRowRetrieve }: Props) {
     const [selected, setSelected] = useState<number[]>([]);
     const [selectedRow, setSelectedRow] = useState<ComprePaymentSummary | null>(null);
     const [approveId, setApproveId] = useState<number | null>(null);
     const [rejectId, setRejectId] = useState<number | null>(null);
     const [rejectReason, setRejectReason] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [permitSubmittingId, setPermitSubmittingId] = useState<number | null>(null);
 
     // Filters
     const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'pending' | 'rejected'>('all');
@@ -120,6 +122,33 @@ export default function TableComprePayment({ paged, columns, tabType, onRowRetri
         );
     }
 
+    function setExamPermit(id: number, decision: 'allowed' | 'not_allowed', studentName: string) {
+        const allowed = decision === 'allowed';
+        const message = allowed
+            ? `Allow ${studentName} to take the comprehensive exam?`
+            : `Mark ${studentName} as not allowed to take the comprehensive exam? They will not be schedulable.`;
+        if (!window.confirm(message)) return;
+        setPermitSubmittingId(id);
+        router.post(
+            route('coordinator.compre-payment.exam-permit', id),
+            { decision },
+            {
+                preserveScroll: true,
+                onFinish: () => setPermitSubmittingId(null),
+            },
+        );
+    }
+
+    function examPermitBadge(status: ComprePaymentSummary['exam_permit_status']) {
+        const styles = {
+            approved: 'border-green-200 bg-green-100 text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-300',
+            rejected: 'border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300',
+            pending: 'border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300',
+        };
+        const labels = { approved: 'Allowed', rejected: 'Not allowed', pending: 'Waiting for AA' };
+        return <Badge variant="outline" className={`rounded-full ${styles[status]}`}>{labels[status]}</Badge>;
+    }
+
     return (
         <div className="border-border dark:bg-background dark:border-border w-full max-w-full overflow-x-auto rounded-md border bg-white">
             {/* Toolbar with filters */}
@@ -168,6 +197,9 @@ export default function TableComprePayment({ paged, columns, tabType, onRowRetri
                         {columns.status && (
                             <TableHead className="dark:bg-muted/30 dark:text-muted-foreground w-[12%] px-1 py-2 text-center">Status</TableHead>
                         )}
+                        {columns.examPermit && (
+                            <TableHead className="dark:bg-muted/30 dark:text-muted-foreground w-[14%] px-1 py-2 text-center">Exam permission</TableHead>
+                        )}
                         {columns.actions && (
                             <TableHead className="dark:bg-muted/30 dark:text-muted-foreground w-[14%] px-1 py-2 text-center">Actions</TableHead>
                         )}
@@ -215,6 +247,8 @@ export default function TableComprePayment({ paged, columns, tabType, onRowRetri
                             )}
 
                             {columns.status && <TableCell className="px-1 py-2 text-center">{statusBadge(r.status)}</TableCell>}
+
+                            {columns.examPermit && <TableCell className="px-1 py-2 text-center">{examPermitBadge(r.exam_permit_status)}</TableCell>}
 
                             {columns.actions && (
                                 <TableCell className="px-1 py-2 text-center">
@@ -325,6 +359,33 @@ export default function TableComprePayment({ paged, columns, tabType, onRowRetri
                                             >
                                                 <CircleArrowLeft size={16} />
                                             </Button>
+                                        )}
+
+                                        {canSetExamPermit && tabType === 'approved' && (
+                                            <>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    title="Allow student to take exam"
+                                                    aria-label={`Allow ${r.first_name} ${r.last_name} to take the exam`}
+                                                    disabled={permitSubmittingId === r.id || r.exam_permit_status === 'approved'}
+                                                    onClick={() => setExamPermit(r.id, 'allowed', `${r.first_name} ${r.last_name}`)}
+                                                    className="text-green-600 hover:text-green-600"
+                                                >
+                                                    <ShieldCheck size={16} />
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    title="Do not allow student to take exam"
+                                                    aria-label={`Do not allow ${r.first_name} ${r.last_name} to take the exam`}
+                                                    disabled={permitSubmittingId === r.id || r.exam_permit_status === 'rejected'}
+                                                    onClick={() => setExamPermit(r.id, 'not_allowed', `${r.first_name} ${r.last_name}`)}
+                                                    className="text-red-600 hover:text-red-600"
+                                                >
+                                                    <CircleX size={16} />
+                                                </Button>
+                                            </>
                                         )}
                                     </div>
                                 </TableCell>

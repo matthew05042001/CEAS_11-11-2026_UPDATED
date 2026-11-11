@@ -80,7 +80,6 @@ class DashboardController extends Controller
                 ],
                 'registrarApplications' => ExamApplication::query()
                     ->with('subjects')
-                    ->where('final_approval_status', 'approved')
                     ->where('registrar_approval_status', 'pending')
                     ->latest('application_id')
                     ->paginate(25, ['*'], 'registrar_page')
@@ -91,6 +90,9 @@ class DashboardController extends Controller
                             ->where('school_id', $studentId)
                             ->when(ctype_digit($studentId), fn ($query) => $query->orWhereKey((int) $studentId))
                             ->first();
+                        $studentResponse = $student
+                            ? StudentResponse::query()->where('user_id', $student->id)->latest('id')->first()
+                            : null;
 
                         return [
                             'application_id' => $application->application_id,
@@ -100,6 +102,7 @@ class DashboardController extends Controller
                             'program' => $application->program,
                             'school_year' => $application->school_year,
                             'created_at' => $application->created_at,
+                            'aa_evaluated_at' => $studentResponse?->evaluated_at,
                             'subjects' => $application->subjects->map(fn ($subject) => [
                                 'name' => $subject->subject_name,
                                 'date' => $subject->exam_date ? substr((string) $subject->exam_date, 0, 10) : null,

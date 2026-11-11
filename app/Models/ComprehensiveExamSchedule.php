@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 class ComprehensiveExamSchedule extends Model
 {
     protected $fillable = [
+        'student_id',
         'exam_id',
         'program',
         'exam_date',
@@ -16,6 +17,7 @@ class ComprehensiveExamSchedule extends Model
         'proctor_name',
         'proctors',
         'teacher_assigned',
+        'change_reason',
     ];
 
     protected $casts = [

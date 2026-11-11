@@ -6,13 +6,45 @@ namespace App\Http\Controllers;
 
 use App\Models\PaymentSubmission;
 use App\Models\ExamApplication;
+use App\Services\ExamReviewAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class PaymentSubmissionController extends Controller
 {
+    public function receipt(Request $request, PaymentSubmission $payment)
+    {
+        abort_unless($payment->payment_type === 'exam', 404);
+
+        $user = $request->user();
+        if ((int) $payment->student_id !== (int) $user->id) {
+            $access = app(ExamReviewAccess::class);
+            $access->authorize($user);
+
+            if ($user->role !== 'Administrative Assistant') {
+                $student = $payment->student;
+                abort_unless($student && in_array($student->program, $access->programs($user), true), 403);
+            }
+        }
+
+        $disk = Storage::disk('public');
+        abort_unless(
+            is_string($payment->receipt_image)
+                && $payment->receipt_image !== ''
+                && $disk->exists($payment->receipt_image),
+            404,
+            'Receipt file not found.'
+        );
+
+        return response()->file($disk->path($payment->receipt_image), [
+            'Content-Type' => $disk->mimeType($payment->receipt_image) ?: 'application/octet-stream',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -27,8 +59,8 @@ class PaymentSubmissionController extends Controller
         $approvalStatus = match (true) {
             ! $application => 'not_submitted',
             strtolower($application->final_approval_status ?? '') === 'rejected' => 'rejected',
-            strtolower($application->final_approval_status ?? '') !== 'approved' => 'coordinator_pending',
             strtolower($application->registrar_approval_status ?? 'pending') !== 'approved' => 'registrar_pending',
+            strtolower($application->final_approval_status ?? '') !== 'approved' => 'aa_pending',
             default => 'approved',
         };
 
@@ -79,7 +111,7 @@ class PaymentSubmissionController extends Controller
             || strtolower($application->registrar_approval_status ?? 'pending') !== 'approved'
         ) {
             throw \Illuminate\Validation\ValidationException::withMessages([
-                'form' => 'Payment is available only after the Coordinator and Registrar approve your comprehensive exam application.',
+                'form' => 'Payment is available only after the Registrar and Administrative Assistant approve your comprehensive exam application.',
             ]);
         }
 
@@ -92,7 +124,7 @@ class PaymentSubmissionController extends Controller
             'or_number' => ['required', 'string', 'max:50'],
             'payment_date' => ['required', 'date'],
             'amount_paid' => ['required', 'numeric', 'min:0'],
-            'receipt_image' => [$existing && $existing->receipt_image ? 'nullable' : 'required', 'image', 'max:5120'],
+            'receipt_image' => [$existing && $existing->receipt_image ? 'nullable' : 'required', 'file', 'mimes:jpg,jpeg,png,gif,webp,pdf', 'max:5120'],
         ]);
 
         $payload = [

@@ -81,7 +81,7 @@ export default function Details({ payment }: { payment: ComprePaymentSummary }) 
                         <div className="md:col-span-2">
                             <div className="text-muted-foreground mb-1 text-xs">Proof</div>
                             <a href={payment.proof_url} target="_blank" rel="noreferrer" className="text-primary break-all underline">
-                                {payment.proof_url}
+                                View uploaded receipt
                             </a>
                         </div>
                     ) : null}

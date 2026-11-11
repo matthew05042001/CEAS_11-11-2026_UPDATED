@@ -30,9 +30,13 @@ The Honorarium Payments page now records prepared, approved, disbursed and claim
 
 ## Comprehensive Exam findings
 
-Verified locally: application creation, subject schedule storage, duplicate submission handling per school year, invalid time validation, and student-specific application display. Added missing exam subject schedule columns through a migration and made application+subjects save in one transaction. Only Student accounts can submit.
+Verified locally: application creation, optional subject schedule storage, duplicate submission handling per school year, invalid time validation when schedules are supplied, and student-specific application display. Students can submit without entering exam schedules. Only Student accounts can submit.
 
 Live eligibility still depends on the school portal session; demo accounts and current Google sign-in do not establish that session. Without it the eligibility API reports that verification is unavailable. The existing coordinator local-development eligibility bypass is separate from the student's check. Exam submission now enforces the existing eligibility result on the server; unverified eligibility blocks submission. This integration does not certify Registrar/Dean approval, results release, or proctor invitation workflows as complete.
+
+The application approval sequence is Student submission → Registrar review → Administrative Assistant approval for payment. The student can submit payment details and a receipt only after both approvals; Coordinators do not approve applications in this sequence.
+
+After the receipt is approved, Coordinators can use **Schedule exam** in that student's row to set the date, time, room, proctor, and assigned teacher. A reason is required only when editing a saved schedule. The schedule is saved for that student and can be edited from the same action.
 
 The inherited route audit still finds15 pre-existing route handlers that are absent. Their details are in `docs/diagram-audit-results.json`. They are not part of the newly integrated Finance endpoints.
 

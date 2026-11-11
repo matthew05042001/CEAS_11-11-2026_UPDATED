@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -11,6 +12,7 @@ type RegistrarApplication = {
     program: string;
     school_year: string | null;
     created_at: string;
+    aa_evaluated_at: string | null;
     subjects: { name: string | null; date: string | null; start_time: string | null; end_time: string | null }[];
 };
 
@@ -62,14 +64,14 @@ export default function RegistrarDashboard() {
     const [approvingId, setApprovingId] = useState<number | null>(null);
 
     function approveApplication(application: RegistrarApplication) {
-        if (!window.confirm(`Approve ${application.student_name}'s comprehensive exam application for payment?`)) return;
+        if (!window.confirm(`Approve ${application.student_name}'s comprehensive exam application and send it to the Administrative Assistant?`)) return;
         setApprovingId(application.application_id);
         router.post(
             `/registrar/comprehensive-exam/${application.application_id}/approve`,
             {},
             {
                 preserveScroll: true,
-                onSuccess: () => toast.success('Application approved for payment.'),
+                onSuccess: () => toast.success('Application approved and sent to the Administrative Assistant.'),
                 onError: () => toast.error('The application could not be approved. Refresh and try again.'),
                 onFinish: () => setApprovingId(null),
             },
@@ -85,9 +87,9 @@ export default function RegistrarDashboard() {
             <section className="bg-card text-card-foreground border-border w-full overflow-hidden rounded-lg border">
                 <div className="border-border flex items-center justify-between border-b p-5">
                     <div>
-                        <h2 className="text-base font-semibold">Comprehensive Exam Final Approval</h2>
+                        <h2 className="text-base font-semibold">Comprehensive Exam Application Review</h2>
                         <p className="text-muted-foreground mt-1 text-xs">
-                            Review Coordinator-approved applications. Students can submit payment after Registrar approval.
+                            Review student applications. After Registrar approval, the Administrative Assistant reviews payment authorization.
                         </p>
                     </div>
                     <span className="text-muted-foreground text-sm">{registrarApplications.total} awaiting approval</span>
@@ -104,6 +106,7 @@ export default function RegistrarDashboard() {
                                     <th className="px-4 py-3 font-medium">Program</th>
                                     <th className="px-4 py-3 font-medium">School year</th>
                                     <th className="px-4 py-3 font-medium">Exam subjects</th>
+                                    <th className="px-4 py-3 font-medium">AA Evaluation</th>
                                     <th className="px-4 py-3 font-medium">Action</th>
                                 </tr>
                             </thead>
@@ -135,12 +138,24 @@ export default function RegistrarDashboard() {
                                             )}
                                         </td>
                                         <td className="px-4 py-3">
+                                            <Badge
+                                                variant="outline"
+                                                className={
+                                                    application.aa_evaluated_at
+                                                        ? 'border-green-200 bg-green-100 text-green-700'
+                                                        : 'border-amber-200 bg-amber-100 text-amber-800'
+                                                }
+                                            >
+                                                {application.aa_evaluated_at ? 'Evaluated' : 'Not evaluated'}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-4 py-3">
                                             <Button
                                                 size="sm"
                                                 disabled={approvingId === application.application_id}
                                                 onClick={() => approveApplication(application)}
                                             >
-                                                {approvingId === application.application_id ? 'Approving...' : 'Approve'}
+                                                {approvingId === application.application_id ? 'Approving...' : 'Approve & send to AA'}
                                             </Button>
                                         </td>
                                     </tr>

@@ -245,6 +245,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::redirect('/payments', '/payment')->name('payment.legacy');
     Route::get('/payment', [PaymentSubmissionController::class, 'index'])->name('payment.index');
     Route::post('/payment', [PaymentSubmissionController::class, 'store'])->name('payment.store');
+    Route::get('/payment-submissions/{payment}/receipt', [PaymentSubmissionController::class, 'receipt'])
+        ->name('payment-submissions.receipt');
 
     /* Student schedule page */
     Route::get('/schedule', [ScheduleController::class, 'index'])->name('schedule.index');
@@ -364,6 +366,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     /* Comprehensive Exam (student) */
     Route::get('/comprehensive-exam', [ComprehensiveExamController::class, 'index'])->name('comprehensive-exam.index');
     Route::post('/comprehensive-exam', [ComprehensiveExamController::class, 'store'])->name('comprehensive-exam.store');
+    Route::delete('/comprehensive-exam/{application}/reset', [ComprehensiveExamController::class, 'reset'])
+        ->whereNumber('application')
+        ->name('comprehensive-exam.reset');
     Route::get('/dean/responses', [StudentResponseController::class, 'deanIndex'])
         ->name('dean.responses.index');
 
@@ -388,6 +393,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('coordinator.compre-payment.approve');
     Route::post('/coordinator/compre-payment/{id}/reject', [CoordinatorComprePaymentController::class, 'reject'])
         ->name('coordinator.compre-payment.reject');
+    Route::post('/coordinator/compre-payment/{id}/exam-permit', [CoordinatorComprePaymentController::class, 'setExamPermit'])
+        ->name('coordinator.compre-payment.exam-permit');
 
     /* Honorarium / Reports */
     Route::get('/generate-report', function () {

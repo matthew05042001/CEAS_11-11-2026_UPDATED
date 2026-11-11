@@ -19,6 +19,8 @@ class DefenseRequestSeeder extends Seeder
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         DB::table('defense_requests')->truncate();
         DB::table('panelists')->truncate();
+        DB::table('adviser_student')->truncate();
+        DB::table('adviser_coordinator')->truncate();
         DB::table('users')->truncate();
         if (DB::getSchemaBuilder()->hasTable('coordinator_program_assignments')) {
             DB::table('coordinator_program_assignments')->truncate();
@@ -126,21 +128,10 @@ class DefenseRequestSeeder extends Seeder
         // 5. Attach advisers to coordinators (adviser_coordinator pivot)
         foreach ($advisers as $i => $adviser) {
             $coordinator = $coordinators[$i % count($coordinators)];
-            $adviser->coordinators()->attach($coordinator->id);
+            $adviser->coordinators()->syncWithoutDetaching([$coordinator->id]);
         }
 
-        // 6. Create Panelists pool
-        $panelistPool = [];
-        foreach (range(1, 20) as $i) {
-            $panelistPool[] = Panelist::create([
-                'name' => $faker->name,
-                'email' => "panelist{$i}@school.edu",
-                'role' => $i % 5 === 0 ? 'Chairperson' : 'Panel Member',
-                'status' => 'Assigned',
-            ]);
-        }
-
-        // Real panelist names
+        // 6. Create panelists
         $realPanelistNames = [
             'Dr. Jose Rizal', 'Dr. Fe del Mundo', 'Dr. Diosdado Banatao', 'Dr. Angel Alcala', 'Dr. Lourdes Cruz',
             'Dr. Baldomero Olivera', 'Dr. Ernesto Domingo', 'Dr. William Padolina', 'Dr. Edgardo Gomez', 'Dr. Gavino Trono',

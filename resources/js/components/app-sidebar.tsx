@@ -88,7 +88,10 @@ const assistantNavItems: MainNavItem[] = [
         title: 'Applications',
         href: '/coordinator/compre-exam',
         icon: FileText,
-        subItems: [{ title: 'Comprehensive Exams', href: '/coordinator/compre-exam' }],
+        subItems: [
+            { title: 'Comprehensive Exams', href: '/coordinator/compre-exam' },
+            { title: 'Exam Payment Receipts', href: '/coordinator/compre-payment' },
+        ],
     },
 ];
 

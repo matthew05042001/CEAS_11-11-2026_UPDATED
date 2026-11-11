@@ -3,7 +3,6 @@ import AppLayout from '@/layouts/app-layout';
 import { usePage } from '@inertiajs/react';
 import { PaperclipIcon, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import CoordinatorCompreScheduleManagement from './schedule-management';
 import TableCompreExam from './table-compre-exam';
 
 export type CompreExamApplicationSummary = {
@@ -22,6 +21,19 @@ export type CompreExamApplicationSummary = {
     applied: boolean;
     submitted_at: string | null;
     application_status: 'approved' | 'pending' | 'rejected' | 'not_yet_applied';
+    registrar_approval_status: 'approved' | 'pending' | null;
+    can_review: boolean;
+    can_schedule: boolean;
+    schedule: {
+        id: number;
+        exam_date: string;
+        exam_time: string;
+        venue: string;
+        proctors: string[];
+        proctor_ids: number[];
+        teacher_assigned: string | null;
+        change_reason: string | null;
+    } | null;
     permit_status: 'approved' | 'pending' | 'rejected' | null;
     subjects: {
         name: string | null;
@@ -49,17 +61,8 @@ type PageProps = {
     eligible: CompreExamApplicationSummary[];
     notEligible: CompreExamApplicationSummary[];
     counts?: { eligible: number; notEligible: number };
-    schedules: {
-        id: number;
-        program: string;
-        exam_date: string;
-        exam_time: string;
-        venue: string;
-        proctors?: string[];
-        proctor_ids?: Array<number | ''>;
-        teacher_assigned: string | null;
-    }[];
     proctorOptions: { id: number; name: string; email: string }[];
+    canEvaluateResponses: boolean;
 };
 
 export default function CoordinatorCompreExamIndex() {
@@ -122,11 +125,14 @@ export default function CoordinatorCompreExamIndex() {
                     </button>
                 </div>
                 <div className="mt-3">
-                    <TableCompreExam paged={paged} columns={columns} />
+                    <TableCompreExam
+                        paged={paged}
+                        columns={columns}
+                        proctorOptions={props.proctorOptions ?? []}
+                        canManageSchedules={isCoordinator}
+                        canEvaluateResponses={props.canEvaluateResponses}
+                    />
                 </div>
-                {isCoordinator && (
-                    <CoordinatorCompreScheduleManagement schedules={props.schedules ?? []} proctorOptions={props.proctorOptions ?? []} />
-                )}
             </div>
         </AppLayout>
     );

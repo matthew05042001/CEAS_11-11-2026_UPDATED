@@ -1,8 +1,8 @@
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, usePage } from '@inertiajs/react';
-import { CalendarX, GraduationCap, Info, Plus, RefreshCcw, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { CalendarX, GraduationCap, Info, Plus, RefreshCcw, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CompreExamForm from './compre-exam-form';
 import DisplayApplication from './display-applications';
@@ -54,6 +54,8 @@ export default function ComprehensiveExamIndex() {
     const { application } = props;
 
     const [open, setOpen] = useState(false);
+    const [resetDialogOpen, setResetDialogOpen] = useState(false);
+    const [resettingApplication, setResettingApplication] = useState(false);
 
     // Eligibility state (student side only)
     const [elig, setElig] = useState<Eligibility>({
@@ -152,6 +154,19 @@ export default function ComprehensiveExamIndex() {
 
     const examClosed = elig.examOpen === false; // NEW
     const hasPending = application ? application.final_approval_status?.toLowerCase() === 'pending' : false;
+    const canResetApplication =
+        application?.registrar_approval_status?.toLowerCase() === 'approved' &&
+        application.final_approval_status?.toLowerCase() === 'approved';
+
+    function resetApplication() {
+        if (!application || resettingApplication) return;
+        setResettingApplication(true);
+        router.delete(`/comprehensive-exam/${application.application_id}/reset`, {
+            preserveScroll: true,
+            onFinish: () => setResettingApplication(false),
+            onSuccess: () => setResetDialogOpen(false),
+        });
+    }
 
     // Reasons to show when not eligible
     const blockers = useMemo(() => {
@@ -223,23 +238,35 @@ export default function ComprehensiveExamIndex() {
                                 </div>
                             </div>
                         </div>
-                        <Button
-                            className="w-full shrink-0 rounded-md bg-rose-500 px-5 text-sm text-white hover:bg-rose-600 sm:w-auto"
-                            onClick={() => setOpen(true)}
-                            disabled={!canApply || (!!application && hasPending)}
-                            title={
-                                examClosed
-                                    ? 'Exam is closed'
-                                    : !canApply
-                                      ? 'You are not eligible yet'
-                                      : hasPending
-                                        ? 'Application pending'
-                                        : 'Submit application'
-                            }
-                        >
-                            <Plus className="mr-1 h-4 w-4" />
-                            Submit application
-                        </Button>
+                        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+                            {canResetApplication && (
+                                <Button
+                                    variant="outline"
+                                    className="w-full border-rose-300 text-rose-700 hover:bg-rose-50 sm:w-auto"
+                                    onClick={() => setResetDialogOpen(true)}
+                                >
+                                    <Trash2 className="mr-1 h-4 w-4" />
+                                    Delete and start over
+                                </Button>
+                            )}
+                            <Button
+                                className="w-full rounded-md bg-rose-500 px-5 text-sm text-white hover:bg-rose-600 sm:w-auto"
+                                onClick={() => setOpen(true)}
+                                disabled={!canApply || (!!application && hasPending)}
+                                title={
+                                    examClosed
+                                        ? 'Exam is closed'
+                                        : !canApply
+                                          ? 'You are not eligible yet'
+                                          : hasPending
+                                            ? 'Application pending'
+                                            : 'Submit application'
+                                }
+                            >
+                                <Plus className="mr-1 h-4 w-4" />
+                                Submit application
+                            </Button>
+                        </div>
                     </div>
                     <div className="flex flex-col gap-4">
                         <CompreExamForm open={open} onOpenChange={setOpen} />
@@ -260,11 +287,11 @@ export default function ComprehensiveExamIndex() {
                                         status:
                                             application.final_approval_status?.toLowerCase() === 'rejected'
                                                 ? 'rejected'
-                                                : application.registrar_approval_status?.toLowerCase() === 'approved'
-                                                  ? 'approved'
+                                                : application.registrar_approval_status?.toLowerCase() !== 'approved'
+                                                  ? 'registrar_pending'
                                                   : application.final_approval_status?.toLowerCase() === 'approved'
-                                                    ? 'registrar_pending'
-                                                    : 'pending',
+                                                    ? 'approved'
+                                                    : 'aa_pending',
                                         subjects: application.subjects,
                                         created_at: application.created_at ?? null,
                                     }}
@@ -274,6 +301,24 @@ export default function ComprehensiveExamIndex() {
                             )}
                         </div>
                     </div>
+                    <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Delete this application and start over?</DialogTitle>
+                                <DialogDescription>
+                                    This permanently deletes the approved application, its subjects, exam payment and receipt, exam schedule, and related comprehensive exam notifications. You can then submit a new application. This cannot be undone.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
+                                <Button variant="outline" disabled={resettingApplication} onClick={() => setResetDialogOpen(false)}>
+                                    Keep application
+                                </Button>
+                                <Button variant="destructive" disabled={resettingApplication} onClick={resetApplication}>
+                                    {resettingApplication ? 'Deleting...' : 'Delete and start over'}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                     {/* Eligibility details dialog */}
                     <Dialog open={showEligDialog} onOpenChange={setShowEligDialog}>
                         <DialogContent className="sm:max-w-md">

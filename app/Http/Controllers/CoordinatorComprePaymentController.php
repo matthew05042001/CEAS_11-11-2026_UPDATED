@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ExamApplication;
 use App\Services\ExamReviewAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,6 +25,7 @@ class CoordinatorComprePaymentController extends Controller
                 'approved' => [],
                 'rejected' => [],
                 'counts' => ['pending' => 0, 'approved' => 0, 'rejected' => 0],
+                'canSetExamPermit' => $user->role === 'Administrative Assistant',
             ]);
         }
 
@@ -43,6 +45,7 @@ class CoordinatorComprePaymentController extends Controller
                 'approved' => [],
                 'rejected' => [],
                 'counts' => ['pending' => 0, 'approved' => 0, 'rejected' => 0],
+                'canSetExamPermit' => $user->role === 'Administrative Assistant',
             ]);
         }
 
@@ -72,7 +75,7 @@ class CoordinatorComprePaymentController extends Controller
             ->where('u.id', '<>', $user->id) // exclude coordinator
             ->selectRaw(implode(', ', array_filter([
                 $idCol ? "p.$idCol as id" : 'COALESCE(p.payment_id, p.id) as id',
-                'u.first_name', 'u.middle_name', 'u.last_name', 'u.email', 'u.school_id',
+                'u.id as user_id', 'u.first_name', 'u.middle_name', 'u.last_name', 'u.email', 'u.school_id',
                 $programCol ? "p.$programCol as program" : 'u.program as program',
                 $orCol ? "p.$orCol as reference" : 'NULL as reference',
                 $amountCol ? "p.$amountCol as amount" : 'NULL as amount',
@@ -89,8 +92,26 @@ class CoordinatorComprePaymentController extends Controller
             $q->orderByDesc("p.$createdCol");
         }
 
-        $rows = $q->get()->map(function ($r) {
+        $paymentRows = $q->get();
+        $applicationStudentIds = $paymentRows->flatMap(fn ($row) => [
+            (string) $row->user_id,
+            (string) ($row->school_id ?? ''),
+        ])->filter()->unique()->values();
+        $applicationsByStudentId = ExamApplication::query()
+            ->whereIn('student_id', $applicationStudentIds)
+            ->orderByDesc('application_id')
+            ->get(['student_id', 'permit_status'])
+            ->unique('student_id')
+            ->keyBy('student_id');
+
+        $rows = $paymentRows->map(function ($r) use ($table, $applicationsByStudentId) {
             $status = in_array($r->status, ['approved', 'rejected', 'pending']) ? $r->status : 'pending';
+            $proofUrl = $r->proof_url ?? null;
+            if ($proofUrl && $table === 'payment_submissions') {
+                $proofUrl = route('payment-submissions.receipt', ['payment' => $r->id]);
+            }
+            $application = $applicationsByStudentId->get((string) $r->school_id)
+                ?? $applicationsByStudentId->get((string) $r->user_id);
 
             return [
                 'id' => (int) $r->id,
@@ -104,8 +125,9 @@ class CoordinatorComprePaymentController extends Controller
                 'amount' => is_null($r->amount) ? null : (float) $r->amount,
                 'submitted_at' => $r->submitted_at ?? null,
                 'status' => $status,
+                'exam_permit_status' => strtolower((string) ($application?->permit_status ?? 'pending')),
                 'remarks' => $r->remarks ?? null,
-                'proof_url' => $r->proof_url ?? null,
+                'proof_url' => $proofUrl,
             ];
         });
 
@@ -123,7 +145,43 @@ class CoordinatorComprePaymentController extends Controller
                 'approved' => $approved->count(),
                 'rejected' => $rejected->count(),
             ],
+            'canSetExamPermit' => $user->role === 'Administrative Assistant',
         ]);
+    }
+
+    public function setExamPermit(Request $request, int $id): RedirectResponse
+    {
+        abort_unless($request->user()?->role === 'Administrative Assistant', 403);
+        $data = $request->validate(['decision' => ['required', 'in:allowed,not_allowed']]);
+
+        $payment = DB::table('payment_submissions')
+            ->where('payment_id', $id)
+            ->where('payment_type', 'exam')
+            ->where('status', 'approved')
+            ->first();
+        abort_unless($payment, 404, 'An approved exam payment was not found.');
+
+        $student = \App\Models\User::query()->findOrFail($payment->student_id);
+        $application = ExamApplication::query()
+            ->whereIn('student_id', array_filter([(string) $student->school_id, (string) $student->id]))
+            ->orderByDesc('application_id')
+            ->firstOrFail();
+        abort_unless(
+            strtolower((string) $application->registrar_approval_status) === 'approved'
+                && strtolower((string) $application->final_approval_status) === 'approved',
+            409,
+            'The application must be approved before setting exam permission.',
+        );
+
+        $allowed = $data['decision'] === 'allowed';
+        $application->update([
+            'permit_status' => $allowed ? 'approved' : 'rejected',
+            'permit_DATE' => now(),
+            'permit_reason' => $allowed ? 'Allowed by Administrative Assistant' : 'Not allowed by Administrative Assistant',
+        ]);
+
+        return redirect()->route('coordinator.compre-payment.index')
+            ->with('success', $allowed ? 'Student is allowed to take the exam.' : 'Student is not allowed to take the exam.');
     }
 
     public function approve(Request $request, int $id): RedirectResponse

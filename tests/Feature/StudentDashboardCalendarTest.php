@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\DefenseRequest;
+use App\Models\ComprehensiveExamSchedule;
 use App\Models\Event;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -21,6 +22,49 @@ test('dashboard calendar feed returns own defenses and school events but exclude
     $rows = collect($response->json());
     expect($rows->pluck('title')->all())->toContain('School activity')->toContain('Defense: '.$mine->thesis_title)->not->toContain('Defense: '.$theirs->thesis_title);
     expect($rows->where('origin', 'defense')->count())->toBe(1);
+});
+
+test('student calendar includes only their comprehensive exam schedule with location and staff details', function () {
+    config(['app.timezone' => 'UTC']);
+    $student = User::factory()->create(['role' => 'Student']);
+    $other = User::factory()->create(['role' => 'Student']);
+    $mine = ComprehensiveExamSchedule::create([
+        'student_id' => $student->id,
+        'exam_id' => 'student-calendar-exam',
+        'program' => 'Master of Arts',
+        'exam_date' => '2026-10-27',
+        'exam_time' => '09:30',
+        'venue' => 'Room 204B',
+        'proctor_name' => 'Proctor One',
+        'proctors' => ['Proctor One'],
+        'teacher_assigned' => 'Teacher One',
+        'change_reason' => 'Room was changed due to maintenance',
+    ]);
+    ComprehensiveExamSchedule::create([
+        'student_id' => $other->id,
+        'exam_id' => 'other-student-calendar-exam',
+        'program' => 'Master of Arts',
+        'exam_date' => '2026-10-27',
+        'exam_time' => '10:30',
+        'venue' => 'Private Room',
+        'proctor_name' => 'Private Proctor',
+        'proctors' => ['Private Proctor'],
+        'teacher_assigned' => 'Private Teacher',
+    ]);
+
+    $response = $this->actingAs($student)
+        ->getJson('/api/calendar/events?from=2026-10-01&to=2026-10-31')
+        ->assertOk();
+    $rows = collect($response->json());
+    $event = $rows->firstWhere('id', 'compre-'.$mine->id);
+
+    expect($event['title'])->toBe('Comprehensive Exam')
+        ->and($event['start'])->toBe('2026-10-27T09:30:00+08:00')
+        ->and($event['origin'])->toBe('comprehensive-exam')
+        ->and($event['description'])->toContain('Room 204B', 'Teacher One', 'Proctor One', 'Room was changed due to maintenance')
+        ->and($event['updated'])->toBeTrue()
+        ->and($event['change_reason'])->toBe('Room was changed due to maintenance')
+        ->and($rows->pluck('title')->all())->not->toContain('Private Room');
 });
 
 test('adviser dashboard calendar includes assigned defenses and school events without other adviser defenses', function () {

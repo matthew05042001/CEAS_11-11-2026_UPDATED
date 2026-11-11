@@ -9,15 +9,19 @@ import { Check, Filter, Info } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { CompreExamApplicationSummary } from './Index';
 import Details from './details';
+import StudentScheduleDialog from './student-schedule-dialog';
 
 type Columns = { student: boolean; program: boolean; eligibility: boolean; applied: boolean; appStatus: boolean; actions: boolean };
 
 type Props = {
     paged: CompreExamApplicationSummary[];
     columns: Columns;
+    proctorOptions: { id: number; name: string; email: string }[];
+    canManageSchedules: boolean;
+    canEvaluateResponses: boolean;
 };
 
-export default function TableCompreExam({ paged, columns }: Props) {
+export default function TableCompreExam({ paged, columns, proctorOptions, canManageSchedules, canEvaluateResponses }: Props) {
     const [selected, setSelected] = useState<number[]>([]);
     const [, setSelectedIndex] = useState<number>(0);
     const [selectedRow, setSelectedRow] = useState<CompreExamApplicationSummary | null>(null);
@@ -199,6 +203,9 @@ export default function TableCompreExam({ paged, columns }: Props) {
                                 Application status
                             </TableHead>
                         )}
+                        <TableHead className="dark:bg-muted/30 dark:text-muted-foreground w-[14%] px-1 py-2 text-center">
+                            Exam permission
+                        </TableHead>
                         {columns.actions && (
                             <TableHead className="dark:bg-muted/30 dark:text-muted-foreground w-[10%] px-1 py-2 text-center">Actions</TableHead>
                         )}
@@ -247,37 +254,60 @@ export default function TableCompreExam({ paged, columns }: Props) {
                             )}
 
                             {columns.appStatus && <TableCell className="px-1 py-2 text-center">{appStatusBadge(r.application_status)}</TableCell>}
+                            <TableCell className="px-1 py-2 text-center">
+                                <Badge
+                                    variant="outline"
+                                    className={
+                                        r.permit_status === 'approved'
+                                            ? 'rounded-full border-green-200 bg-green-100 text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-300'
+                                            : r.permit_status === 'rejected'
+                                              ? 'rounded-full border-rose-200 bg-rose-100 text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300'
+                                              : 'rounded-full border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300'
+                                    }
+                                >
+                                    {r.permit_status === 'approved' ? 'Allowed' : r.permit_status === 'rejected' ? 'Not allowed' : 'Waiting for AA'}
+                                </Badge>
+                            </TableCell>
 
                             {columns.actions && (
                                 <TableCell className="px-1 py-2 text-center">
-                                    <Dialog>
-                                        <DialogTrigger asChild>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => {
-                                                    setSelectedRow(r);
-                                                    setSelectedIndex(i);
-                                                }}
-                                                title="Details"
-                                                className="dark:bg-muted/30"
-                                            >
-                                                <Info />
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent className="max-h-[90vh] w-full max-w-3xl min-w-260">
-                                            <div className="max-h-[80vh] overflow-y-auto px-1">
-                                                {selectedRow && <Details application={selectedRow} />}
-                                            </div>
-                                        </DialogContent>
-                                    </Dialog>
+                                    <div className="flex flex-wrap items-center justify-center gap-1">
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        setSelectedRow(r);
+                                                        setSelectedIndex(i);
+                                                    }}
+                                                    title="Details"
+                                                    className="dark:bg-muted/30"
+                                                >
+                                                    <Info />
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent className="max-h-[90vh] w-full max-w-3xl min-w-260">
+                                                <div className="max-h-[80vh] overflow-y-auto px-1">
+                                                    {selectedRow && <Details application={selectedRow} canEvaluateResponse={canEvaluateResponses} />}
+                                                </div>
+                                            </DialogContent>
+                                        </Dialog>
+                                        {canManageSchedules && r.can_schedule && (
+                                            <StudentScheduleDialog
+                                                key={`${r.id}-${r.schedule?.id ?? 'new'}-${r.schedule?.exam_date ?? ''}`}
+                                                student={r}
+                                                proctorOptions={proctorOptions}
+                                            />
+                                        )}
+                                    </div>
                                 </TableCell>
                             )}
                         </TableRow>
                     ))}
                     {filtered.length === 0 && (
                         <TableRow>
-                            <TableCell colSpan={Object.values(columns).filter(Boolean).length + 1} className="py-16 text-center">
+                            <TableCell colSpan={Object.values(columns).filter(Boolean).length + 2} className="py-16 text-center">
                                 <div className="text-muted-foreground">No records found.</div>
                             </TableCell>
                         </TableRow>

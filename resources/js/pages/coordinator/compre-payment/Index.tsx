@@ -18,6 +18,7 @@ export type ComprePaymentSummary = {
     amount: number | null;
     submitted_at: string | null;
     status: 'pending' | 'approved' | 'rejected';
+    exam_permit_status: 'pending' | 'approved' | 'rejected';
     remarks?: string | null;
     proof_url?: string | null;
 };
@@ -28,6 +29,7 @@ type PageProps = {
     approved: ComprePaymentSummary[];
     rejected: ComprePaymentSummary[];
     counts: { pending: number; approved: number; rejected: number };
+    canSetExamPermit: boolean;
 };
 
 export default function CoordinatorComprePaymentIndex() {
@@ -49,7 +51,7 @@ export default function CoordinatorComprePaymentIndex() {
         );
     }, [tab, q, pending, approved, rejected]);
 
-    const columns = { student: true, program: true, reference: true, amount: true, date: true, status: true, actions: true };
+    const columns = { student: true, program: true, reference: true, amount: true, date: true, status: true, examPermit: true, actions: true };
 
     return (
         <AppLayout>
@@ -153,6 +155,7 @@ export default function CoordinatorComprePaymentIndex() {
                         paged={paged}
                         columns={columns}
                         tabType={tab}
+                        canSetExamPermit={props.canSetExamPermit}
                         onRowApprove={(id) => console.log('approve payment', id)}
                         onRowReject={(id) => console.log('reject payment', id)}
                         onRowRetrieve={(id) => console.log('retrieve payment', id)}

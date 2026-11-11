@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ComprehensiveExamSchedule;
 use App\Models\DefenseRequest;
 use App\Models\Event;
 use Carbon\Carbon;
@@ -80,7 +81,46 @@ class ScheduleEventController extends Controller
             ];
         })->filter();
 
-        return response()->json(collect($events->all())->concat($defenses)->values());
+        $comprehensiveExams = collect();
+        if ($user->role === 'Student') {
+            $comprehensiveExams = ComprehensiveExamSchedule::query()
+                ->where('student_id', $user->id)
+                ->whereBetween('exam_date', [$from->toDateString(), $to->toDateString()])
+                ->get()
+                ->map(function (ComprehensiveExamSchedule $schedule) {
+                    $start = Carbon::parse(
+                        $schedule->exam_date->format('Y-m-d').' '.$schedule->exam_time,
+                        'Asia/Manila',
+                    );
+                    $proctors = collect($schedule->proctors)->filter()->implode(', ');
+                    $details = [
+                        'Venue: '.$schedule->venue,
+                        'Teacher: '.$schedule->teacher_assigned,
+                    ];
+                    if ($proctors !== '') {
+                        $details[] = 'Proctors: '.$proctors;
+                    }
+                    if (filled($schedule->change_reason)) {
+                        $details[] = 'Reason for update: '.$schedule->change_reason;
+                    }
+
+                    return [
+                        'id' => 'compre-'.$schedule->id,
+                        'title' => 'Comprehensive Exam',
+                        'start' => $start->toIso8601String(),
+                        'allDay' => false,
+                        'editable' => false,
+                        'type' => 'comprehensive-exam',
+                        'color' => '#e11d48',
+                        'origin' => 'comprehensive-exam',
+                        'description' => implode('; ', $details),
+                        'updated' => filled($schedule->change_reason),
+                        'change_reason' => $schedule->change_reason,
+                    ];
+                });
+        }
+
+        return response()->json(collect($events->all())->concat($defenses)->concat($comprehensiveExams)->values());
     }
 
     public function store(Request $r)

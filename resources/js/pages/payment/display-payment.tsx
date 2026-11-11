@@ -160,7 +160,7 @@ export default function DisplayPayment({ payment, student }: Props) {
                             {payment.receipt_image ? (
                                 <a
                                     className="text-primary-600 inline-flex items-center gap-1 text-sm underline hover:no-underline"
-                                    href={`/storage/${payment.receipt_image}`}
+                                    href={`/payment-submissions/${payment.id}/receipt`}
                                     target="_blank"
                                     rel="noreferrer"
                                 >

@@ -1,16 +1,12 @@
 import HeadingSmall from '@/components/heading-small';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
 import { Stepper } from '@/components/ui/Stepper';
 import type { SharedData } from '@/types';
 import { useForm, usePage } from '@inertiajs/react';
-import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Check, Plus } from 'lucide-react';
+import { Check } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
 type Props = {
@@ -18,8 +14,6 @@ type Props = {
     onOpenChange: (open: boolean) => void;
     onFinish?: () => void;
 };
-
-type Subject = { subject: string; date: string; startTime: string; endTime: string };
 
 export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) {
     const { props } = usePage<SharedData>();
@@ -35,7 +29,6 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
         officeAddress: string;
         mobileNo: string;
         telephoneNo: string;
-        subjects: Subject[];
     }>({
         schoolYear: '',
         program: user.program || '',
@@ -46,7 +39,6 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
         officeAddress: '',
         mobileNo: String(user.mobile_no || user.contact_number || ''),
         telephoneNo: '',
-        subjects: [{ subject: '', date: '', startTime: '', endTime: '' }],
     });
 
     const [currentStep, setCurrentStep] = useState(0);
@@ -100,23 +92,6 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
         }
     }
 
-    function addSubjectRow() {
-        setData('subjects', [...data.subjects, { subject: '', date: '', startTime: '', endTime: '' }]);
-    }
-
-    function removeSubjectRow(index: number) {
-        setData(
-            'subjects',
-            data.subjects.filter((_, i) => i !== index),
-        );
-    }
-
-    function updateSubject(index: number, field: keyof Subject, value: string) {
-        const next = data.subjects.map((s, i) => (i === index ? { ...s, [field]: value } : s));
-        setData('subjects', next);
-        clearFieldError(`subjects.${index}.${field}`);
-    }
-
     function handleSubmit() {
         post(route('comprehensive-exam.store'), {
             preserveScroll: true,
@@ -126,9 +101,7 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
             },
             onError: (validationErrors) => {
                 const fields = Object.keys(validationErrors);
-                if (fields.some((field) => field.startsWith('subjects.'))) {
-                    setCurrentStep(2);
-                } else if (fields.some((field) => ['mobileNo', 'telephoneNo', 'officeAddress', 'email_address'].includes(field))) {
+                if (fields.some((field) => ['mobileNo', 'telephoneNo', 'officeAddress', 'email_address'].includes(field))) {
                     setCurrentStep(1);
                 } else if (fields.some((field) => ['schoolYear', 'program', 'family_name', 'first_name', 'id_number'].includes(field))) {
                     setCurrentStep(0);
@@ -164,17 +137,6 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
             }
         } else if (step === 1) {
             if (!data.mobileNo.trim()) nextErrors.mobileNo = 'Enter your mobile number.';
-        } else if (step === 2) {
-            data.subjects.forEach((subject, index) => {
-                if (!subject.subject.trim()) nextErrors[`subjects.${index}.subject`] = 'Enter a subject name.';
-                if (!subject.date) nextErrors[`subjects.${index}.date`] = 'Select an exam date.';
-                if (!subject.startTime) nextErrors[`subjects.${index}.startTime`] = 'Enter a start time.';
-                if (!subject.endTime) {
-                    nextErrors[`subjects.${index}.endTime`] = 'Enter an end time.';
-                } else if (subject.startTime && subject.endTime <= subject.startTime) {
-                    nextErrors[`subjects.${index}.endTime`] = 'End time must be after start time.';
-                }
-            });
         }
 
         setClientErrors(nextErrors);
@@ -346,148 +308,11 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
             ),
         },
         {
-            title: 'Examination Schedules',
-            content: (
-                <>
-                    <HeadingSmall title="Step 3: Examination Schedules" />
-                    <div className="mt-4 mb-6">
-                        <p className="text-justify text-sm text-gray-600">
-                            Add the subjects and schedules for your comprehensive examination. Each subject must have a specific date and time slot.
-                        </p>
-                    </div>
-
-                    <div className="space-y-6">
-                        {data.subjects.map((subj, idx) => (
-                            <div
-                                key={idx}
-                                className="group border-border bg-card text-card-foreground relative rounded-lg border p-6 shadow-sm transition-all hover:border-rose-200 hover:shadow-md"
-                            >
-                                {/* Subject Number Badge */}
-                                <div className="absolute -top-3 -left-2 rounded bg-rose-500 px-2 py-1 text-xs font-semibold text-white">
-                                    Subject {idx + 1}
-                                </div>
-
-                                {/* Remove Button (X) */}
-                                {data.subjects.length > 1 && (
-                                    <button
-                                        onClick={() => removeSubjectRow(idx)}
-                                        className="border-border bg-card text-card-foreground absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border text-gray-400 shadow-sm transition-all hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
-                                        title="Remove Subject"
-                                        type="button"
-                                    >
-                                        <span className="sr-only">Remove Subject</span>
-                                        <span className="text-lg leading-none">&times;</span>
-                                    </button>
-                                )}
-
-                                <div className="space-y-6">
-                                    {/* First Row: Subject and Date */}
-                                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                                        {/* Subject Input */}
-                                        <div className="w-full">
-                                            <Label className="text-sm font-medium text-gray-700">
-                                                Subject Name
-                                                <span className="ml-1 text-rose-500">*</span>
-                                            </Label>
-                                            <Input
-                                                value={subj.subject}
-                                                onChange={(e) => updateSubject(idx, 'subject', e.target.value)}
-                                                placeholder="e.g. Advanced Mathematics"
-                                                className="mt-1 w-full transition-colors focus:border-rose-300"
-                                                aria-invalid={Boolean(fieldError(`subjects.${idx}.subject`))}
-                                            />
-                                            {fieldError(`subjects.${idx}.subject`) && <p className="text-xs text-red-600">{fieldError(`subjects.${idx}.subject`)}</p>}
-                                        </div>
-
-                                        {/* Date Picker */}
-                                        <div className="w-full">
-                                            <Label className="text-sm font-medium text-gray-700">
-                                                Exam Date
-                                                <span className="ml-1 text-rose-500">*</span>
-                                            </Label>
-                                            <Popover>
-                                                <PopoverTrigger asChild>
-                                                    <Button
-                                                        variant="outline"
-                                                        type="button"
-                                                        className={`mt-1 w-full justify-start text-left transition-colors ${
-                                                            subj.date ? 'text-gray-900' : 'text-gray-500'
-                                                        } hover:border-rose-300 hover:bg-rose-50`}
-                                                        aria-invalid={Boolean(fieldError(`subjects.${idx}.date`))}
-                                                    >
-                                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                                        {subj.date ? format(new Date(subj.date), 'MMMM d, yyyy') : 'Select date'}
-                                                    </Button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="pointer-events-auto z-[9999] w-auto p-0" align="start" side="bottom">
-                                                    <Calendar
-                                                        mode="single"
-                                                        selected={subj.date ? new Date(subj.date) : undefined}
-                                                        onSelect={(date) => updateSubject(idx, 'date', date ? format(date, 'yyyy-MM-dd') : '')}
-                                                        initialFocus
-                                                        disabled={(date) => date < new Date()}
-                                                    />
-                                                </PopoverContent>
-                                            </Popover>
-                                            {fieldError(`subjects.${idx}.date`) && <p className="text-xs text-red-600">{fieldError(`subjects.${idx}.date`)}</p>}
-                                        </div>
-                                    </div>
-
-                                    {/* Second Row: Time Inputs */}
-                                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                                        <div>
-                                            <Label className="text-sm font-medium text-gray-700">
-                                                Start Time
-                                                <span className="ml-1 text-rose-500">*</span>
-                                            </Label>
-                                            <Input
-                                                type="time"
-                                                value={subj.startTime || ''}
-                                                onChange={(e) => updateSubject(idx, 'startTime', e.target.value)}
-                                                className="mt-1 w-full transition-colors focus:border-rose-300"
-                                                aria-invalid={Boolean(fieldError(`subjects.${idx}.startTime`))}
-                                            />
-                                            {fieldError(`subjects.${idx}.startTime`) && <p className="text-xs text-red-600">{fieldError(`subjects.${idx}.startTime`)}</p>}
-                                        </div>
-                                        <div>
-                                            <Label className="text-sm font-medium text-gray-700">
-                                                End Time
-                                                <span className="ml-1 text-rose-500">*</span>
-                                            </Label>
-                                            <Input
-                                                type="time"
-                                                value={subj.endTime || ''}
-                                                onChange={(e) => updateSubject(idx, 'endTime', e.target.value)}
-                                                className="mt-1 w-full transition-colors focus:border-rose-300"
-                                                aria-invalid={Boolean(fieldError(`subjects.${idx}.endTime`))}
-                                            />
-                                            {fieldError(`subjects.${idx}.endTime`) && <p className="text-xs text-red-600">{fieldError(`subjects.${idx}.endTime`)}</p>}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-
-                        {/* Add Subject Button */}
-                        <Button
-                            type="button"
-                            onClick={addSubjectRow}
-                            className="mt-4 flex w-full items-center justify-center gap-2 border-2 border-dashed border-gray-300 bg-gray-50 py-6 text-gray-600 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
-                            variant="outline"
-                        >
-                            <Plus className="h-5 w-5" />
-                            Add Another Subject
-                        </Button>
-                    </div>
-                </>
-            ),
-        },
-        {
             title: 'Review Submission',
             content: (
                 <>
                     <div className="w-full pb-5">
-                        <HeadingSmall title="Step 4: Review Submission" />
+                        <HeadingSmall title="Step 3: Review Submission" />
                         <div className="space-y-6 rounded-xl border-2 border-rose-400 bg-rose-50 p-8 shadow-lg">
                             <div className="flex flex-col gap-6 md:flex-row">
                                 <div className="flex-1 space-y-2">
@@ -523,37 +348,6 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
                                 </div>
                             </div>
 
-                            <Separator />
-
-                            <div>
-                                <div className="mb-2 text-lg font-bold text-rose-700">Subjects & Schedules</div>
-                                <div className="overflow-x-auto">
-                                    <table className="bg-card text-card-foreground min-w-full rounded-lg border border-rose-300">
-                                        <thead className="bg-rose-100">
-                                            <tr>
-                                                <th className="px-4 py-2 text-left font-semibold text-rose-700">#</th>
-                                                <th className="px-4 py-2 text-left font-semibold text-rose-700">Subject</th>
-                                                <th className="px-4 py-2 text-left font-semibold text-rose-700">Date</th>
-                                                <th className="px-4 py-2 text-left font-semibold text-rose-700">Time</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {data.subjects.map((subj, idx) => (
-                                                <tr key={idx} className="border-t border-rose-200">
-                                                    <td className="px-4 py-2 font-bold text-rose-700">{idx + 1}</td>
-                                                    <td className="px-4 py-2">{subj.subject || '--'}</td>
-                                                    <td className="px-4 py-2">{subj.date ? format(new Date(subj.date), 'MMMM d, yyyy') : '--'}</td>
-                                                    <td className="px-4 py-2">
-                                                        {subj.startTime && subj.endTime
-                                                            ? `${formatTime12hr(subj.startTime)} - ${formatTime12hr(subj.endTime)}`
-                                                            : '--'}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </>
@@ -566,7 +360,7 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
             <DialogContent className="flex h-[85vh] w-full max-w-3xl flex-col">
                 <DialogHeader>
                     <DialogTitle>Comprehensive Exam Application</DialogTitle>
-                    <DialogDescription>Your student response details and exam schedule will be submitted together.</DialogDescription>
+                    <DialogDescription>Review your application details before submitting.</DialogDescription>
                 </DialogHeader>
 
                 {showSuccessPanel ? (
@@ -590,15 +384,4 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
             </DialogContent>
         </Dialog>
     );
-}
-
-// Helper to format 24h -> 12h time
-function formatTime12hr(timeStr?: string) {
-    if (!timeStr) return '--';
-    const [hour, minute] = timeStr.split(':');
-    let h = parseInt(hour, 10);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12;
-    if (h === 0) h = 12;
-    return `${h.toString().padStart(2, '0')}:${minute} ${ampm}`;
 }

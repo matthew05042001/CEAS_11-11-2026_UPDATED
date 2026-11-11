@@ -15,7 +15,6 @@ class RegistrarExamApprovalController extends Controller
         return DB::transaction(function () use ($request, $application) {
             $application = ExamApplication::whereKey($application->getKey())->lockForUpdate()->firstOrFail();
 
-            abort_unless(strtolower($application->final_approval_status ?? '') === 'approved', 409, 'The Coordinator must approve this application first.');
             abort_unless(strtolower($application->registrar_approval_status ?? 'pending') === 'pending', 409, 'This application has already received Registrar review.');
 
             $application->update([
@@ -24,7 +23,7 @@ class RegistrarExamApprovalController extends Controller
                 'registrar_approved_by' => $request->user()->id,
             ]);
 
-            return to_route('dashboard')->with('success', 'Comprehensive exam application approved for payment.');
+            return to_route('dashboard')->with('success', 'Application approved and sent to the Administrative Assistant for payment approval.');
         });
     }
 }

@@ -8,7 +8,13 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import type { CompreExamApplicationSummary } from './Index';
 
-export default function Details({ application }: { application: CompreExamApplicationSummary }) {
+export default function Details({
+    application,
+    canEvaluateResponse,
+}: {
+    application: CompreExamApplicationSummary;
+    canEvaluateResponse: boolean;
+}) {
     const elig = application.eligible;
     const [status, setStatus] = useState(application.application_status);
     const [remarks, setRemarks] = useState(application.review_remarks ?? '');
@@ -189,11 +195,11 @@ export default function Details({ application }: { application: CompreExamApplic
                             <Badge variant="outline" className="border-green-600 text-green-700">
                                 Evaluated
                             </Badge>
-                        ) : (
+                        ) : canEvaluateResponse ? (
                             <Button size="sm" disabled={evaluating} onClick={markResponseEvaluated}>
                                 {evaluating ? 'Saving...' : 'Mark evaluated'}
                             </Button>
-                        )}
+                        ) : null}
                     </div>
                     <dl className="grid gap-3 rounded-md border p-3 sm:grid-cols-2">
                         <div>
@@ -224,7 +230,7 @@ export default function Details({ application }: { application: CompreExamApplic
                 </section>
             )}
 
-            {application.application_id && status === 'pending' && (
+            {application.application_id && application.can_review && status === 'pending' && (
                 <section className="mt-5 space-y-3 border-t pt-4">
                     <h3 className="font-semibold">Review application</h3>
                     <Input

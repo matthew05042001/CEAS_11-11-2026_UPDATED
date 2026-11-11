@@ -5,10 +5,15 @@
 namespace App\Http\Controllers;
 
 use App\Models\ExamApplication;
+use App\Models\ComprehensiveExamSchedule;
+use App\Models\Notification;
+use App\Models\PaymentSubmission;
 use App\Models\StudentResponse;
 use App\Services\ComprehensiveEligibilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -88,7 +93,7 @@ class ComprehensiveExamController extends Controller
             'officeAddress' => ['nullable', 'string', 'max:255'],
             'mobileNo' => ['required', 'string', 'max:50'],
             'telephoneNo' => ['nullable', 'string', 'max:50'],
-            'subjects' => ['required', 'array', 'min:1'],
+            'subjects' => ['sometimes', 'array'],
             'subjects.*.subject' => ['required', 'string', 'max:255'],
             'subjects.*.date' => ['required', 'date'],
             'subjects.*.startTime' => ['required', 'date_format:H:i'],
@@ -116,6 +121,7 @@ class ComprehensiveExamController extends Controller
                 [
                     'permit_status' => 'pending',
                     'final_approval_status' => 'pending',
+                    'registrar_approval_status' => 'pending',
                     'contact_number' => $validated['mobileNo'],
                     'telephone_number' => $validated['telephoneNo'] ?? null,
                     'office_address' => $validated['officeAddress'] ?? null,
@@ -129,7 +135,7 @@ class ComprehensiveExamController extends Controller
                     ->with('info', 'You already have an application for this school year.');
             }
 
-            foreach ($validated['subjects'] as $s) {
+            foreach ($validated['subjects'] ?? [] as $s) {
                 $application->subjects()->create([
                     'subject_name' => $s['subject'],
                     'exam_date' => $s['date'],
@@ -150,5 +156,68 @@ class ComprehensiveExamController extends Controller
 
             return to_route('comprehensive-exam.index')->with('success', 'Application submitted.');
         });
+    }
+
+    public function reset(Request $request, int $applicationId)
+    {
+        abort_unless($request->user()?->role === 'Student', 403);
+
+        $user = $request->user();
+        $studentId = $user->student_id ?? $user->school_id ?? $user->id;
+        $receiptPaths = [];
+
+        DB::transaction(function () use ($applicationId, $studentId, $user, &$receiptPaths) {
+            $application = ExamApplication::query()
+                ->where('application_id', $applicationId)
+                ->where('student_id', $studentId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            abort_unless(
+                strtolower((string) $application->registrar_approval_status) === 'approved'
+                    && strtolower((string) $application->final_approval_status) === 'approved',
+                409,
+                'Only an approved application can be reset here.',
+            );
+
+            $payments = PaymentSubmission::query()
+                ->where('student_id', $user->id)
+                ->where('payment_type', 'exam');
+            $receiptPaths = $payments->pluck('receipt_image')->filter()->values()->all();
+
+            $application->subjects()->delete();
+            $application->delete();
+            $payments->delete();
+            ComprehensiveExamSchedule::query()->where('student_id', $user->id)->delete();
+            Notification::query()
+                ->where('user_id', $user->id)
+                ->whereIn('type', [
+                    'comprehensive-exam-payment-ready',
+                    'comprehensive-exam-reviewed',
+                    'comprehensive-exam-scheduled',
+                    'comprehensive-exam-schedule-updated',
+                ])
+                ->delete();
+        });
+
+        $disk = Storage::disk('public');
+        $failedReceiptDeletes = [];
+        foreach ($receiptPaths as $path) {
+            if ($disk->exists($path) && ! $disk->delete($path)) {
+                $failedReceiptDeletes[] = $path;
+            }
+        }
+        if ($failedReceiptDeletes !== []) {
+            Log::error('Comprehensive exam reset could not remove receipt files.', [
+                'user_id' => $user->id,
+                'application_id' => $applicationId,
+                'paths' => $failedReceiptDeletes,
+            ]);
+
+            return to_route('comprehensive-exam.index')
+                ->with('warning', 'Your application was reset, but a receipt file could not be removed. Please contact support.');
+        }
+
+        return to_route('comprehensive-exam.index')->with('success', 'Your application was reset. You can submit a new one now.');
     }
 }

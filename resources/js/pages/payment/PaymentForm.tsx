@@ -1,6 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { format, parse } from 'date-fns';
-import { Calendar as CalendarIcon, Image as ImageIcon, Paperclip } from 'lucide-react';
+import { Calendar as CalendarIcon, Paperclip } from 'lucide-react';
 import React, { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -205,9 +205,9 @@ export default function PaymentForm({ canSubmit, payment, onSuccess }: Props) {
                         {errors.payment_date && <p className="mt-1 text-xs text-red-600">{errors.payment_date}</p>}
                     </div>
 
-                    {/* Receipt image (attachment-style UI) */}
+                    {/* Receipt attachment */}
                     <div className="md:col-span-2">
-                        <Label className="text-sm">Receipt image</Label>
+                        <Label className="text-sm">Receipt file (image or PDF)</Label>
                         <div className="mt-1 mb-2 flex items-center gap-2">
                             <Input readOnly value={fileName || ''} placeholder="No file chosen" className="h-9 flex-1" />
                             <Button variant="outline" type="button" onClick={handleChooseFile} disabled={!canSubmit || processing} className="h-9">
@@ -217,7 +217,7 @@ export default function PaymentForm({ canSubmit, payment, onSuccess }: Props) {
                             <input
                                 ref={fileInputRef}
                                 type="file"
-                                accept="image/*"
+                                accept="image/*,application/pdf,.pdf"
                                 name="receipt_image"
                                 className="hidden"
                                 onChange={handleFileChange}
@@ -227,8 +227,7 @@ export default function PaymentForm({ canSubmit, payment, onSuccess }: Props) {
                         </div>
                         {errors.receipt_image && <p className="mt-1 text-xs text-red-600">{errors.receipt_image}</p>}
 
-                        {/* Preview or existing image link; reduced preview height */}
-                        {previewUrl ? (
+                        {previewUrl && data.receipt_image?.type.startsWith('image/') ? (
                             <div className="mt-2">
                                 <img
                                     src={previewUrl}
@@ -236,15 +235,22 @@ export default function PaymentForm({ canSubmit, payment, onSuccess }: Props) {
                                     className="h-36 w-auto rounded-md border border-slate-200 bg-white object-contain dark:border-slate-700"
                                 />
                             </div>
+                        ) : previewUrl ? (
+                            <div className="mt-2 text-sm">
+                                <a className="text-primary inline-flex items-center gap-1 underline hover:no-underline" href={previewUrl} target="_blank" rel="noreferrer">
+                                    <Paperclip className="h-4 w-4" />
+                                    View selected receipt
+                                </a>
+                            </div>
                         ) : payment?.receipt_image ? (
                             <div className="mt-2 text-sm">
                                 <a
                                     className="text-primary inline-flex items-center gap-1 underline hover:no-underline"
-                                    href={`/storage/${payment.receipt_image}`}
+                                    href={`/payment-submissions/${payment.payment_id}/receipt`}
                                     target="_blank"
                                     rel="noreferrer"
                                 >
-                                    <ImageIcon className="h-4 w-4" />
+                                    <Paperclip className="h-4 w-4" />
                                     View current receipt
                                 </a>
                             </div>
